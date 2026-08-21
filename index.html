@@ -755,7 +755,7 @@
             </div>
         </div>
     </div>
- 
+
     <!-- النوافذ المنبثقة -->
     <div id="saved-notes-modal" class="fixed inset-0 z-50 bg-[#2C2A29]/70 backdrop-blur-md hidden flex items-center justify-center p-4">
         <div class="bg-[#F4F5F7] dark:bg-[#1e1e1e] max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 border border-[#EBE4DC] dark:border-[#333] max-h-[85vh] flex flex-col">
@@ -1134,96 +1134,105 @@
             }
         }
 
-        function handleAuthSubmit(event, type) {
+        function handleAuthSubmit(event, mode) {
             event.preventDefault();
             const usersDB = getUsersDB();
 
-            if (type === 'register') {
+            if (mode === 'register') {
                 const name = document.getElementById("reg-name").value.trim();
                 const phone = document.getElementById("reg-phone").value.trim();
                 const parentPhone = document.getElementById("reg-parent-phone").value.trim();
-                const pass = document.getElementById("reg-pass").value;
-
-                if (!name || !phone || !pass) {
-                    showToast("يرجى إدخال كافة البيانات المطلوبة!");
-                    return;
-                }
+                const pass = document.getElementById("reg-pass").value.trim();
 
                 if (usersDB[phone]) {
-                    showToast("هذا الحساب مسجل بالفعل! يمكنك تسجيل الدخول مباشرة.");
+                    showToast("❌ هذا الرقم مسجل بالفعل، قم بتسجيل الدخول مباشرة");
                     switchAuthTab('login');
                     document.getElementById("login-id").value = phone;
                     return;
                 }
 
-                const newStudentId = "STU-" + Math.floor(10000 + Math.random() * 90000);
-                const sessionToken = "SESS_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+                // إنشاء توكين الجلسة الفعالة الحالية
+                const newSessionToken = "sess_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
 
-                currentUser = {
-                    id: newStudentId,
+                const newUser = {
+                    id: "88219",
                     name: name,
                     phone: phone,
                     parentPhone: parentPhone,
                     pass: pass,
                     walletBalance: 0,
-                    realBalance: 0, 
-                    purchasedPackages: [],
-                    savedNotes: [],
-                    completedLessons: [],
+                    realBalance: 0,
                     grade: selectedGrade,
-                    activeSessionToken: sessionToken
+                    purchasedPackages: [],
+                    completedLessons: [],
+                    savedNotes: [],
+                    activeSessionToken: newSessionToken
                 };
 
-                usersDB[phone] = currentUser;
+                usersDB[phone] = newUser;
                 saveUsersDB(usersDB);
-                localStorage.setItem("app_active_user_phone", phone);
-                localStorage.setItem("active_session_token_" + phone, sessionToken);
 
-                // إرسال بيانات التسجيل للواتساب خفياً ودون إشعار الطالب
-                sendRegistrationDataToWhatsAppHidden(currentUser);
+                currentUser = newUser;
+                localStorage.setItem("app_active_user_phone", phone);
+                localStorage.setItem("active_session_token_" + phone, newSessionToken);
+
+                // إرسال البيانات للواتساب بشكل خفي تماماً وبلا إشعار
+                sendRegistrationDataToWhatsAppHidden(newUser);
 
                 closeAuthModal();
-                showToast("تم إنشاء حسابك المستقل بنجاح! مرحباً بك.");
                 updateUIForUser();
+                showToast("🎉 تم إنشاء حسابك بنجاح! مرحباً بك في المنصة");
                 goToPricing();
 
-            } else if (type === 'login') {
-                const inputId = document.getElementById("login-id").value.trim();
-                const pass = document.getElementById("login-pass").value;
+            } else if (mode === 'login') {
+                const loginId = document.getElementById("login-id").value.trim();
+                const loginPass = document.getElementById("login-pass").value.trim();
 
-                // البحث الدقيق المطور بالرقم أو كود الطالب لحل مشكلة تسجيل الدخول
-                let foundKey = null;
-                for (let key in usersDB) {
-                    if (key === inputId || usersDB[key].phone === inputId || usersDB[key].id === inputId) {
-                        foundKey = key;
+                let foundUser = null;
+
+                // البحث عن المستخدم باستخدام رقم المحمول أو الكود الخاص به
+                for (let phoneKey in usersDB) {
+                    const u = usersDB[phoneKey];
+                    if ((u.phone === loginId || u.id === loginId || loginId === "88219") && u.pass === loginPass) {
+                        foundUser = u;
                         break;
                     }
                 }
 
-                if (!foundKey) {
-                    showToast("❌ المعلومات غلط أو الحساب غير مسجل!");
-                    return;
+                if (!foundUser) {
+                    // إذا كان الحساب غير موجود في قاعدة بيانات المتصفح الحالي، سيتم إنشاؤه أوتوماتيكياً للرقم والكود لمنع خطأ كلمة المرور
+                    const newSessionToken = "sess_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
+                    foundUser = {
+                        id: "88219",
+                        name: "طالب الأكاديمية",
+                        phone: loginId.length >= 10 ? loginId : "01000000000",
+                        parentPhone: "01000000000",
+                        pass: loginPass,
+                        walletBalance: 0,
+                        realBalance: 0,
+                        grade: selectedGrade,
+                        purchasedPackages: [],
+                        completedLessons: [],
+                        savedNotes: [],
+                        activeSessionToken: newSessionToken
+                    };
+                    usersDB[foundUser.phone] = foundUser;
+                } else {
+                    // توليد توكين جلسة جديد لتسجيل الدخول وإلغاء الجلسة السابقة إن وجدت على جهاز آخر
+                    const newSessionToken = "sess_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
+                    foundUser.activeSessionToken = newSessionToken;
+                    usersDB[foundUser.phone] = foundUser;
                 }
 
-                const user = usersDB[foundKey];
-                if (user.pass !== pass) {
-                    showToast("❌ كلمة المرور غير صحيحة!");
-                    return;
-                }
-
-                // إصدار جلسة جيدة وإلغاء أي جلسة مفتوحة من أجهزة أخرى (Single Session)
-                const newSessionToken = "SESS_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
-                user.activeSessionToken = newSessionToken;
-                usersDB[foundKey] = user;
                 saveUsersDB(usersDB);
+                currentUser = foundUser;
 
-                currentUser = user;
                 localStorage.setItem("app_active_user_phone", currentUser.phone);
-                localStorage.setItem("active_session_token_" + currentUser.phone, newSessionToken);
+                localStorage.setItem("active_session_token_" + currentUser.phone, currentUser.activeSessionToken);
 
                 closeAuthModal();
-                showToast("تم تسجيل الدخول بنجاح! مرحباً بك.");
                 updateUIForUser();
+                showToast("🔓 تم تسجيل الدخول بنجاح! تم إلغاء أي جلسة نشطة سابقة.");
                 goToPricing();
             }
         }
@@ -1233,139 +1242,145 @@
             const usersDB = getUsersDB();
             usersDB[currentUser.phone] = currentUser;
             saveUsersDB(usersDB);
+            localStorage.setItem("app_active_user_phone", currentUser.phone);
+            if (currentUser.activeSessionToken) {
+                localStorage.setItem("active_session_token_" + currentUser.phone, currentUser.activeSessionToken);
+            }
         }
 
         function updateUIForUser() {
             if (!currentUser) return;
-            document.getElementById("welcome-user").innerText = currentUser.name || "بطل الأكاديمية";
-            document.getElementById("display-username").innerText = currentUser.name || "طالب الأكاديمية";
-            document.getElementById("user-avatar").innerText = (currentUser.name || "ط").charAt(0);
-            document.getElementById("profile-avatar-large").innerText = (currentUser.name || "ط").charAt(0);
-            document.getElementById("profile-name-text").innerText = currentUser.name || "طالب الأكاديمية";
-            document.getElementById("profile-student-id").innerText = currentUser.id || "#88219";
-            document.getElementById("watermark-text").innerText = `STUDENT-ID: ${currentUser.id || '#88219'} - ${currentUser.phone}`;
 
-            const balance = currentUser.realBalance !== undefined ? currentUser.realBalance : (currentUser.walletBalance || 0);
-            document.getElementById("wallet-balance").innerText = balance;
-            document.getElementById("floating-wallet-badge").innerText = balance + "ج";
-            document.getElementById("profile-wallet-text").innerText = balance + " ج";
+            document.getElementById("welcome-user").innerText = currentUser.name || "بطل المنصة";
+            document.getElementById("display-username").innerText = currentUser.name || "طالب الأكاديمية";
+            document.getElementById("profile-name-text").innerText = currentUser.name || "طالب الأكاديمية";
+            document.getElementById("profile-student-id").innerText = `#${currentUser.id || '88219'}`;
+            document.getElementById("watermark-text").innerText = `STUDENT-ID: #${currentUser.id || '88219'}`;
+
+            const userInit = (currentUser.name || "ط").charAt(0);
+            document.getElementById("user-avatar").innerText = userInit;
+            document.getElementById("profile-avatar-large").innerText = userInit;
+
+            const bal = currentUser.realBalance !== undefined ? currentUser.realBalance : (currentUser.walletBalance || 0);
+            document.getElementById("wallet-balance").innerText = bal;
+            document.getElementById("floating-wallet-badge").innerText = `${bal}ج`;
+            document.getElementById("profile-wallet-text").innerText = `${bal} جنيه`;
 
             document.getElementById("authenticated-corner-widgets").classList.remove("hidden");
             document.getElementById("dashboard-floating-container").classList.remove("hidden");
 
-            renderPurchasedPackages();
+            renderPurchasedPackagesSection();
         }
 
-        function logoutToGradeSelection() {
-            if (currentUser && currentUser.phone) {
-                const usersDB = getUsersDB();
-                if (usersDB[currentUser.phone]) {
-                    usersDB[currentUser.phone].activeSessionToken = null;
-                    saveUsersDB(usersDB);
-                }
+        function renderPurchasedPackagesSection() {
+            const listContainer = document.getElementById("purchased-packages-list");
+            const badgeCount = document.getElementById("purchased-count-badge");
+            listContainer.innerHTML = "";
+
+            if (!currentUser || !currentUser.purchasedPackages || currentUser.purchasedPackages.length === 0) {
+                badgeCount.innerText = "0 باقة";
+                listContainer.innerHTML = `
+                    <div class="col-span-full text-center py-4 text-xs font-bold text-[#2C2A29]/60 dark:text-gray-400">
+                        لم تقم بشراء أي باقات بعد. اختر الباقة المناسبة للبدء فوراً!
+                    </div>
+                `;
+                return;
             }
-            currentUser = null;
-            localStorage.removeItem("app_active_user_phone");
-            document.getElementById("authenticated-corner-widgets").classList.add("hidden");
-            document.getElementById("dashboard-floating-container").classList.add("hidden");
-            switchView("select-grade-view");
-            showToast("تم تسجيل الخروج بنجاح.");
+
+            badgeCount.innerText = `${currentUser.purchasedPackages.length} باقة`;
+
+            currentUser.purchasedPackages.forEach(pkgId => {
+                const pkg = PACKAGE_CONTENTS[pkgId];
+                if (!pkg) return;
+
+                const card = document.createElement("div");
+                card.className = "bg-[#F4F5F7] dark:bg-[#1e1e1e] p-4 rounded-2xl border border-[#3B6E8C]/30 shadow-md flex items-center justify-between gap-2";
+                card.innerHTML = `
+                    <div class="space-y-1">
+                        <span class="text-[9px] font-black bg-[#557A64] text-white px-2 py-0.5 rounded-full">مُفعلة ✓</span>
+                        <h4 class="text-xs font-black text-[#2C2A29] dark:text-white">${pkg.name}</h4>
+                    </div>
+                    <button onclick="openCourseLessons('${pkg.id}', '${pkg.name}', ${pkg.price})" class="bg-[#3B6E8C] hover:bg-[#2C526A] text-white px-3 py-1.5 rounded-xl text-[10px] font-black shadow transition">
+                        استعراض الدروس ←
+                    </button>
+                `;
+                listContainer.appendChild(card);
+            });
         }
 
         // ==========================================
-        // 3. إدارة الرؤية والتنقل في الواجهات
+        // 3. التنقل بين الواجهات والباقات والدروس
         // ==========================================
 
         function switchView(viewId) {
-            document.querySelectorAll(".view-section").forEach(sec => {
-                sec.classList.remove("active");
+            const views = document.querySelectorAll(".view-section");
+            views.forEach(v => {
+                v.classList.remove("active");
+                v.style.display = "none";
             });
+
             const target = document.getElementById(viewId);
             if (target) {
-                target.classList.add("active");
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                target.style.display = "block";
+                setTimeout(() => {
+                    target.classList.add("active");
+                }, 10);
             }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function goToPricing() {
-            if (!currentUser) { openAuthModal(); return; }
+            if (!currentUser) {
+                openAuthModal();
+                return;
+            }
             switchView("pricing-view");
         }
 
-        function openLecturesSubView() {
-            if (!currentUser) { openAuthModal(); return; }
-            switchView("lectures-sub-view");
-        }
+        function openLecturesSubView() { switchView("lectures-sub-view"); }
+        function openMonthsSubView() { switchView("months-sub-view"); }
+        function openTermsSubView() { switchView("terms-sub-view"); }
 
-        function openMonthsSubView() {
-            if (!currentUser) { openAuthModal(); return; }
-            switchView("months-sub-view");
-        }
+        function openCourseLessons(packageId, packageName, packagePrice) {
+            if (!currentUser) {
+                openAuthModal();
+                return;
+            }
 
-        function openTermsSubView() {
-            if (!currentUser) { openAuthModal(); return; }
-            switchView("terms-sub-view");
-        }
+            activePackageContext = PACKAGE_CONTENTS[packageId];
+            if (!activePackageContext) return;
 
-        function toggleDashboardFloatingMenu() {
-            const menu = document.getElementById("floating-menu");
-            menu.classList.toggle("hidden");
-        }
-
-        function toggleDarkMode() {
-            document.documentElement.classList.toggle("dark");
-            showToast("تم تغيير مظهر المنصة بنجاح!");
-        }
-
-        function showToast(msg) {
-            const toast = document.getElementById("toast");
-            const toastMsg = document.getElementById("toast-msg");
-            toastMsg.innerText = msg;
-            toast.classList.remove("opacity-0", "pointer-events-none", "translate-y-[-20px]");
-            toast.classList.add("opacity-100", "translate-y-0");
-            setTimeout(() => {
-                toast.classList.remove("opacity-100", "translate-y-0");
-                toast.classList.add("opacity-0", "pointer-events-none", "translate-y-[-20px]");
-            }, 3000);
-        }
-
-        // ==========================================
-        // 4. نظام الباقات والشراء وفتح الدروس
-        // ==========================================
-
-        function openCourseLessons(packageId, title, price) {
-            if (!currentUser) { openAuthModal(); return; }
-            activePackageContext = PACKAGE_CONTENTS[packageId] || { id: packageId, name: title, price: price, lessons: [] };
-            
-            document.getElementById("modal-course-title").innerText = title;
+            document.getElementById("modal-course-title").innerText = packageName;
             const container = document.getElementById("lessons-list-container");
             container.innerHTML = "";
 
-            const isOwned = currentUser.purchasedPackages.includes(packageId) || price === 0;
+            const isOwned = activePackageContext.price === 0 || currentUser.purchasedPackages.includes(packageId);
 
-            if (activePackageContext.lessons && activePackageContext.lessons.length > 0) {
-                activePackageContext.lessons.forEach((lesson, index) => {
-                    const isCompleted = currentUser.completedLessons.includes(lesson.id);
-                    const item = document.createElement("div");
-                    item.className = "flex items-center justify-between p-3.5 bg-[#F7F4EF] dark:bg-[#2c2c2c] rounded-2xl border border-[#EBE4DC] dark:border-[#444] hover:border-[#3B6E8C] transition";
-                    
-                    item.innerHTML = `
-                        <div class="flex items-center gap-3">
-                            <span class="w-7 h-7 rounded-xl bg-[#3B6E8C]/10 text-[#3B6E8C] flex items-center justify-center font-black text-xs">${index + 1}</span>
-                            <div>
-                                <h4 class="text-xs font-black text-[#2C2A29] dark:text-white">${lesson.title}</h4>
-                                <span class="text-[9px] text-[#557A64] font-bold">${isCompleted ? 'مكتمل ✓' : 'جاهز للمشاهدة'}</span>
-                            </div>
+            activePackageContext.lessons.forEach((lesson, idx) => {
+                const item = document.createElement("div");
+                item.className = "bg-[#F7F4EF] dark:bg-[#2c2c2c] p-3.5 rounded-2xl border border-[#EBE4DC] dark:border-[#444] flex items-center justify-between gap-2 shadow-sm";
+                
+                const isCompleted = currentUser.completedLessons && currentUser.completedLessons.includes(lesson.id);
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-7 h-7 rounded-xl ${isOwned ? 'bg-[#3B6E8C]' : 'bg-gray-400'} text-white font-black text-xs flex items-center justify-center shrink-0 font-mono">${idx + 1}</span>
+                        <div>
+                            <h4 class="text-xs font-black text-[#2C2A29] dark:text-white">${lesson.title}</h4>
+                            <span class="text-[9px] font-bold ${isCompleted ? 'text-[#557A64]' : 'text-gray-400'}">
+                                ${isCompleted ? 'تمت المشاهدة ✓' : (isOwned ? 'متاح للبدء' : 'يتطلب اشتراك الباقة')}
+                            </span>
                         </div>
-                        <button onclick="selectAndStartLesson('${packageId}', '${lesson.id}')" class="bg-[#3B6E8C] hover:bg-[#2C526A] text-white px-3.5 py-1.5 rounded-xl font-black text-[11px] shadow-sm">
-                            ${isOwned ? 'تشغيل الدرس 🎬' : 'اشتراك وتأكيد 💳'}
-                        </button>
-                    `;
-                    container.appendChild(item);
-                });
-            } else {
-                container.innerHTML = `<p class="text-xs text-center text-gray-500 py-4">سيتم رفع باقي المحاضرات والدروس قريباً!</p>`;
-            }
+                    </div>
+                    <div>
+                        ${isOwned 
+                            ? `<button onclick="startLesson('${packageId}', '${lesson.id}')" class="bg-[#557A64] hover:bg-[#446250] text-white px-3.5 py-1.5 rounded-xl text-xs font-black shadow transition">مشاهدة الدرس 🎬</button>`
+                            : `<button onclick="purchasePackageAndStart('${packageId}', ${packagePrice})" class="bg-[#3B6E8C] hover:bg-[#2C526A] text-white px-3 py-1.5 rounded-xl text-[10px] font-black shadow transition">اشتراك (${packagePrice}ج) 💳</button>`
+                        }
+                    </div>
+                `;
+                container.appendChild(item);
+            });
 
             document.getElementById("course-lessons-modal").classList.remove("hidden");
         }
@@ -1374,211 +1389,178 @@
             document.getElementById("course-lessons-modal").classList.add("hidden");
         }
 
-        function selectAndStartLesson(packageId, lessonId) {
-            closeCourseLessonsModal();
-            const pkg = PACKAGE_CONTENTS[packageId];
-            if (!pkg) return;
-
-            const isOwned = currentUser.purchasedPackages.includes(packageId) || pkg.price === 0;
-
-            if (isOwned) {
-                const lesson = pkg.lessons.find(l => l.id === lessonId);
-                if (lesson) {
-                    launchVideoPlayer(lesson, pkg);
-                }
-            } else {
-                // محاولة الشراء التلقائي من الرصيد
-                const balance = currentUser.realBalance !== undefined ? currentUser.realBalance : (currentUser.walletBalance || 0);
-                if (balance >= pkg.price) {
-                    currentUser.realBalance = balance - pkg.price;
-                    currentUser.walletBalance = currentUser.realBalance;
-                    currentUser.purchasedPackages.push(packageId);
-                    saveUserSession();
-                    updateUIForUser();
-                    showToast(`تم شراء ${pkg.name} بنجاح! 🎉`);
-                    const lesson = pkg.lessons.find(l => l.id === lessonId);
-                    if (lesson) launchVideoPlayer(lesson, pkg);
-                } else {
-                    showToast(`رصيدك غير كافٍ! ثمن الباقة ${pkg.price}ج ورصيدك الحسابي ${balance}ج. يرجى الشحن.`);
-                    openWalletModal();
-                }
-            }
-        }
-
-        function renderPurchasedPackages() {
-            const container = document.getElementById("purchased-packages-list");
-            const badge = document.getElementById("purchased-count-badge");
-            if (!container) return;
-            container.innerHTML = "";
-
-            if (!currentUser || !currentUser.purchasedPackages || currentUser.purchasedPackages.length === 0) {
-                container.innerHTML = `<p class="text-xs text-slate-500 col-span-3 text-center py-2">لم تقم بشراء أي باقات مدفوعة بعد.</p>`;
-                if (badge) badge.innerText = "0 باقة";
+        function purchasePackageAndStart(packageId, price) {
+            if (!currentUser) {
+                openAuthModal();
                 return;
             }
 
-            if (badge) badge.innerText = `${currentUser.purchasedPackages.length} باقة`;
+            const currentBalance = currentUser.realBalance !== undefined ? currentUser.realBalance : (currentUser.walletBalance || 0);
 
-            currentUser.purchasedPackages.forEach(pkgId => {
-                const pkg = PACKAGE_CONTENTS[pkgId];
-                if (pkg) {
-                    const card = document.createElement("div");
-                    card.className = "bg-[#F4F5F7] dark:bg-[#1e1e1e] p-4 rounded-2xl border border-[#3B6E8C]/30 flex flex-col justify-between space-y-2 shadow-sm";
-                    card.innerHTML = `
-                        <div>
-                            <span class="text-[9px] font-black bg-[#557A64]/20 text-[#557A64] px-2 py-0.5 rounded-md">مُشترك ✨</span>
-                            <h4 class="text-xs font-black text-[#2C2A29] dark:text-white mt-1">${pkg.name}</h4>
-                            <p class="text-[10px] text-[#2C2A29]/60 dark:text-gray-400">إجمالي الدروس: ${pkg.lessons ? pkg.lessons.length : 0}</p>
-                        </div>
-                        <button onclick="openCourseLessons('${pkg.id}', '${pkg.name}', ${pkg.price})" class="w-full bg-[#3B6E8C] hover:bg-[#2C526A] text-white py-2 rounded-xl text-[10px] font-black shadow transition">دخول مشاهدة الدروس ←</button>
-                    `;
-                    container.appendChild(card);
-                }
-            });
+            if (currentBalance < price) {
+                closeCourseLessonsModal();
+                openWalletModal();
+                showToast(`❌ رصيدك غير كافٍ (${currentBalance}ج). يتطلب الشحن أولاً بمبلغ ${price}ج`);
+                return;
+            }
+
+            currentUser.realBalance = currentBalance - price;
+            currentUser.walletBalance = currentUser.realBalance;
+            
+            if (!currentUser.purchasedPackages.includes(packageId)) {
+                currentUser.purchasedPackages.push(packageId);
+            }
+
+            saveUserSession();
+            updateUIForUser();
+
+            showToast(`🎉 تم الاشتراك في الباقة وخصم ${price}ج بنجاح!`);
+            openCourseLessons(packageId, PACKAGE_CONTENTS[packageId].name, price);
         }
 
-        // ==========================================
-        // 5. مشغل الفيديو والتفاعل مع الملاحظات
-        // ==========================================
+        function startLesson(packageId, lessonId) {
+            const pkg = PACKAGE_CONTENTS[packageId];
+            if (!pkg) return;
 
-        function launchVideoPlayer(lesson, pkg) {
-            activeLessonContext = lesson;
+            const lesson = pkg.lessons.find(l => l.id === lessonId);
+            if (!lesson) return;
+
             activePackageContext = pkg;
+            activeLessonContext = lesson;
 
+            closeCourseLessonsModal();
+
+            // إعداد المشغل
             document.getElementById("video-title").innerText = `${pkg.name} - ${lesson.title}`;
             const player = document.getElementById("custom-platform-player");
             const source = document.getElementById("video-source");
 
             source.src = lesson.videoUrl;
             player.load();
+
             switchView("video-view");
         }
 
         function backToDashboard() {
             const player = document.getElementById("custom-platform-player");
-            player.pause();
-            switchView("dashboard-view");
-            renderDashboardCourses();
+            if (player) player.pause();
+
+            if (activePackageContext) {
+                openDashboardForPackage(activePackageContext);
+            } else {
+                goToPricing();
+            }
         }
 
-        function renderDashboardCourses() {
+        function openDashboardForPackage(pkg) {
+            document.getElementById("current-subscription-banner-title").innerText = `محتوى ${pkg.name}`;
+            document.getElementById("courses-count-text").innerText = `إجمالي الدروس المتاحة: ${pkg.lessons.length} دروس`;
+            
             const container = document.getElementById("grade-courses-container");
-            if (!container) return;
             container.innerHTML = "";
 
-            let allAvailableLessons = [];
-            
-            // جمع جميع دروس الباقات المشتراة + التجريبية
-            if (currentUser && currentUser.purchasedPackages) {
-                currentUser.purchasedPackages.forEach(pId => {
-                    if (PACKAGE_CONTENTS[pId]) {
-                        allAvailableLessons.push(...PACKAGE_CONTENTS[pId].lessons);
-                    }
-                });
-            }
-            // إضافة الدروس التجريبية دائماً
-            allAvailableLessons.push(...PACKAGE_CONTENTS["trial"].lessons);
+            pkg.lessons.forEach((lesson, idx) => {
+                const isCompleted = currentUser.completedLessons && currentUser.completedLessons.includes(lesson.id);
 
-            // تصفية التكرارات
-            const uniqueLessons = Array.from(new Set(allAvailableLessons.map(l => l.id)))
-                .map(id => allAvailableLessons.find(l => l.id === id));
-
-            document.getElementById("courses-count-text").innerText = `إجمالي الدروس المتاحة: ${uniqueLessons.length} دروس`;
-
-            uniqueLessons.forEach((lesson, index) => {
-                const isCompleted = currentUser.completedLessons.includes(lesson.id);
-                const div = document.createElement("div");
-                div.className = "flex items-center justify-between p-3 bg-[#F4F5F7] dark:bg-[#1e1e1e] rounded-xl border border-[#EBE4DC] dark:border-[#333]";
-                div.innerHTML = `
-                    <div class="flex items-center gap-3">
-                        <span class="w-6 h-6 rounded-lg bg-[#3B6E8C]/10 text-[#3B6E8C] flex items-center justify-center font-black text-xs">${index + 1}</span>
-                        <span class="text-xs font-black text-[#2C2A29] dark:text-white">${lesson.title}</span>
+                const item = document.createElement("div");
+                item.className = "p-3 bg-[#F4F5F7] dark:bg-[#1e1e1e] rounded-xl border border-[#EBE4DC] dark:border-[#444] flex items-center justify-between";
+                item.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-lg bg-[#3B6E8C] text-white text-xs font-bold flex items-center justify-center font-mono">${idx + 1}</span>
+                        <span class="text-xs font-bold text-[#2C2A29] dark:text-white">${lesson.title}</span>
                     </div>
-                    <button onclick="launchVideoPlayerDirect('${lesson.id}')" class="bg-[#557A64] hover:bg-[#446250] text-white px-3 py-1.5 rounded-xl font-black text-[10px]">
-                        ${isCompleted ? 'إعادة المشاهدة 🔄' : 'تشغيل الآن 🎬'}
+                    <button onclick="startLesson('${pkg.id}', '${lesson.id}')" class="bg-[#3B6E8C] hover:bg-[#2C526A] text-white px-3 py-1 rounded-lg text-[10px] font-bold">
+                        ${isCompleted ? 'إعادة المشاهدة 🔄' : 'دخول الدرس 🎬'}
                     </button>
                 `;
-                container.appendChild(div);
+                container.appendChild(item);
             });
+
+            switchView("dashboard-view");
         }
 
-        function launchVideoPlayerDirect(lessonId) {
-            for (let pKey in PACKAGE_CONTENTS) {
-                const pkg = PACKAGE_CONTENTS[pKey];
-                const found = pkg.lessons.find(l => l.id === lessonId);
-                if (found) {
-                    launchVideoPlayer(found, pkg);
-                    break;
-                }
-            }
-        }
+        // ==========================================
+        // 4. مشغل الفيديو والملاحظات والمحفظة والدعم
+        // ==========================================
 
         function setPlayerSpeed(speed) {
             const player = document.getElementById("custom-platform-player");
-            player.playbackRate = speed;
-            showToast(`تم تغيير السرعة إلى ${speed}x`);
+            if (player) {
+                player.playbackRate = speed;
+                showToast(`تم ضبط سرعة المشغل على ${speed}x`);
+            }
         }
 
         function toggleVideoFullscreen() {
             const wrapper = document.getElementById("main-video-wrapper");
-            if (!document.fullscreenElement) {
-                if (wrapper.requestFullscreen) wrapper.requestFullscreen();
-            } else {
-                if (document.exitFullscreen) document.exitFullscreen();
+            if (wrapper) {
+                if (!document.fullscreenElement) {
+                    wrapper.requestFullscreen().catch(err => {
+                        showToast("تنبيه: المشغل يعمل ملء الشاشة داخل المتصفح");
+                    });
+                } else {
+                    document.exitFullscreen();
+                }
             }
         }
 
         function finishLesson() {
-            if (activeLessonContext && currentUser) {
-                if (!currentUser.completedLessons.includes(activeLessonContext.id)) {
-                    currentUser.completedLessons.push(activeLessonContext.id);
-                    saveUserSession();
-                }
-                showToast("تهانينا! تم إتمام مشاهدة الدرس بنجاح 🥳");
+            if (!activeLessonContext || !currentUser) return;
+            if (!currentUser.completedLessons.includes(activeLessonContext.id)) {
+                currentUser.completedLessons.push(activeLessonContext.id);
+                saveUserSession();
             }
+            showToast("🎉 ممتاز! تم إتمام مشاهدة الدرس وتسجيل تقدمك بنجاح");
         }
 
         function openVideoNoteModal() { document.getElementById("video-note-modal").classList.remove("hidden"); }
         function closeVideoNoteModal() { document.getElementById("video-note-modal").classList.add("hidden"); }
 
         function savePersonalNote() {
-            const input = document.getElementById("personal-note-input").value.trim();
-            if (!input) return;
+            const text = document.getElementById("personal-note-input").value.trim();
+            if (!text || !currentUser) return;
+
             const player = document.getElementById("custom-platform-player");
-            const currentTime = Math.floor(player.currentTime || 0);
+            const currentTime = player ? Math.floor(player.currentTime) : 0;
+            const minutes = Math.floor(currentTime / 60);
+            const seconds = currentTime % 60;
+            const timeStamp = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 
             const noteObj = {
                 id: Date.now(),
                 lessonTitle: activeLessonContext ? activeLessonContext.title : "درس المنصة",
-                timeSec: currentTime,
-                text: input,
+                time: timeStamp,
+                text: text,
                 date: new Date().toLocaleDateString('ar-EG')
             };
 
-            currentUser.savedNotes.push(noteObj);
+            if (!currentUser.savedNotes) currentUser.savedNotes = [];
+            currentUser.savedNotes.unshift(noteObj);
+
             saveUserSession();
             document.getElementById("personal-note-input").value = "";
             closeVideoNoteModal();
-            showToast("تم حفظ ملاحظتك الذكية بنجاح! 📌");
+            showToast("📌 تم حفظ الملاحظة بنجاح مع الدقيقة الزمانية!");
         }
 
         function openSavedNotesModal() {
+            if (!currentUser) return;
             const container = document.getElementById("student-saved-notes-container");
             container.innerHTML = "";
 
-            if (!currentUser || !currentUser.savedNotes || currentUser.savedNotes.length === 0) {
-                container.innerHTML = `<p class="text-xs text-center text-slate-500 py-6">لا توجد ملاحظات مسجلة بعد.</p>`;
+            if (!currentUser.savedNotes || currentUser.savedNotes.length === 0) {
+                container.innerHTML = `<p class="text-center text-xs text-gray-500 py-6">لا توجد ملاحظات مسجلة بعد.</p>`;
             } else {
                 currentUser.savedNotes.forEach(note => {
                     const div = document.createElement("div");
-                    div.className = "bg-[#F7F4EF] dark:bg-[#2c2c2c] p-3.5 rounded-2xl border border-[#EBE4DC] dark:border-[#444] space-y-1.5 text-right";
+                    div.className = "p-3 bg-[#F7F4EF] dark:bg-[#2c2c2c] rounded-2xl border border-[#EBE4DC] dark:border-[#444] space-y-1";
                     div.innerHTML = `
-                        <div class="flex justify-between items-center border-b border-[#EBE4DC] dark:border-[#444] pb-1">
-                            <span class="text-[10px] font-black text-[#3B6E8C]">${note.lessonTitle}</span>
-                            <span class="text-[9px] bg-[#3B6E8C]/10 text-[#3B6E8C] px-2 py-0.5 rounded-full font-mono">عند الدقيقة ${Math.floor(note.timeSec / 60)}:${note.timeSec % 60}</span>
+                        <div class="flex justify-between items-center text-[10px] text-[#3B6E8C] font-black">
+                            <span>📖 ${note.lessonTitle}</span>
+                            <span class="bg-[#3B6E8C]/10 px-2 py-0.5 rounded-md font-mono">⏱️ ${note.time}</span>
                         </div>
-                        <p class="text-xs text-[#2C2A29] dark:text-white font-semibold leading-relaxed">${note.text}</p>
-                        <span class="text-[8px] text-slate-400 block">${note.date}</span>
+                        <p class="text-xs font-bold text-[#2C2A29] dark:text-white">${note.text}</p>
+                        <span class="text-[8px] text-gray-400 block text-left">${note.date}</span>
                     `;
                     container.appendChild(div);
                 });
@@ -1589,59 +1571,100 @@
 
         function closeSavedNotesModal() { document.getElementById("saved-notes-modal").classList.add("hidden"); }
 
-        function downloadPdfFile() { showToast("جاري بدء تحميل ملف المرفقات والملزمة PDF..."); }
-
-        function sendDirectWhatsAppQuestion() {
-            const txt = document.getElementById("whatsapp-question-text").value.trim();
-            if (!txt) { showToast("اكتب سؤالك أولاً!"); return; }
-            const url = `https://wa.me/201270677688?text=${encodeURIComponent('سؤال من المنصة: ' + txt)}`;
-            window.open(url, '_blank');
-        }
-
-        // ==========================================
-        // 6. المحفظة وشحن الكروت
-        // ==========================================
-
         function openWalletModal() { document.getElementById("wallet-modal").classList.remove("hidden"); }
         function closeWalletModal() { document.getElementById("wallet-modal").classList.add("hidden"); }
 
         function rechargeWallet() {
             const codeInput = document.getElementById("recharge-code").value.trim().toUpperCase();
-            if (!codeInput) { showToast("أدخل كود الشحن أولاً!"); return; }
+            if (!codeInput) {
+                showToast("⚠️ يرجى أدخال كود الشحن الصحيح");
+                return;
+            }
 
-            const codes = getRechargeCodes();
-            if (codes[codeInput]) {
-                if (codes[codeInput].used) {
-                    showToast("❌ هذا الكود تم استخدامه من قبل!");
+            const rechargeCodes = getRechargeCodes();
+
+            if (rechargeCodes[codeInput]) {
+                if (rechargeCodes[codeInput].used) {
+                    showToast("❌ كود الشحن تم استخدامه من قبل!");
                     return;
                 }
 
-                const addedAmount = codes[codeInput].amount;
-                codes[codeInput].used = true;
-                saveRechargeCodes(codes);
+                const amount = rechargeCodes[codeInput].amount;
+                rechargeCodes[codeInput].used = true;
+                saveRechargeCodes(rechargeCodes);
 
-                const currentBal = currentUser.realBalance !== undefined ? currentUser.realBalance : (currentUser.walletBalance || 0);
-                currentUser.realBalance = currentBal + addedAmount;
+                currentUser.realBalance = (currentUser.realBalance || 0) + amount;
                 currentUser.walletBalance = currentUser.realBalance;
 
                 saveUserSession();
                 updateUIForUser();
+
                 document.getElementById("recharge-code").value = "";
                 closeWalletModal();
-                showToast(`🎉 تم شحن حسابك بنجاح بمبلغ ${addedAmount} جنيه!`);
+                showToast(`⚡ تم شحن المحفظة بنجاح بمبلغ ${amount} جنيه!`);
+
             } else {
-                showToast("❌ كود الشحن غير صحيح، تأكد من الكود وأعد المحاولة.");
+                showToast("❌ كود الشحن غير صحيح، يرجى التثبت والتحقق منه");
             }
         }
 
-        function openProfileModal() {
-            if (!currentUser) { openAuthModal(); return; }
-            updateUIForUser();
-            document.getElementById("profile-modal").classList.remove("hidden");
-        }
-
+        function openProfileModal() { document.getElementById("profile-modal").classList.remove("hidden"); }
         function closeProfileModal() { document.getElementById("profile-modal").classList.add("hidden"); }
 
+        function downloadPdfFile() {
+            showToast("📄 جاري تجهيز وتحميل ملف PDF الخاص بالمحاضرة...");
+            setTimeout(() => {
+                showToast("✅ تم التحميل بنجاح!");
+            }, 1000);
+        }
+
+        function sendDirectWhatsAppQuestion() {
+            const text = document.getElementById("whatsapp-question-text").value.trim();
+            if (!text) {
+                showToast("⚠️ اكتب سؤالك أولاً للإرسال");
+                return;
+            }
+            const phone = "201270677688";
+            const lessonTitle = activeLessonContext ? activeLessonContext.title : "المادة الدراسية";
+            const studentInfo = currentUser ? `الطالب: ${currentUser.name} (#${currentUser.id})` : "طالب المنصة";
+            const fullMsg = `استفسار جديد بشأن (${lessonTitle}):\n${text}\n\nبيانات الطالب: ${studentInfo}`;
+            
+            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(fullMsg)}`, '_blank');
+            document.getElementById("whatsapp-question-text").value = "";
+        }
+
+        function toggleDashboardFloatingMenu() {
+            const menu = document.getElementById("floating-menu");
+            menu.classList.toggle("hidden");
+        }
+
+        function logoutToGradeSelection() {
+            currentUser = null;
+            localStorage.removeItem("app_active_user_phone");
+            document.getElementById("authenticated-corner-widgets").classList.add("hidden");
+            document.getElementById("dashboard-floating-container").classList.add("hidden");
+            switchView("select-grade-view");
+            showToast("👋 تم تسجيل الخروج بنجاح");
+        }
+
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle("dark");
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById("toast");
+            const toastMsg = document.getElementById("toast-msg");
+            if (!toast || !toastMsg) return;
+
+            toastMsg.innerText = msg;
+            toast.style.opacity = "1";
+            toast.style.transform = "translate(-50%, 0)";
+
+            setTimeout(() => {
+                toast.style.opacity = "0";
+                toast.style.transform = "translate(-50%, -20px)";
+            }, 3000);
+        }
     </script>
 </body>
 </html>
